@@ -1,12 +1,10 @@
-use crate::{
-	//benchmarking::{inherent_benchmark_data, RemarkBuilder, TransferKeepAliveBuilder},
-	chain_spec, cli::{Cli, Subcommand}, service
-};
+use crate::{chain_spec, cli::{Cli, Subcommand}, service};
 use frame_benchmarking_cli::{BenchmarkCmd, SUBSTRATE_REFERENCE_HARDWARE};
 use sc_cli::SubstrateCli;
-use sc_service::PartialComponents;
-use service::frontier_database_dir;
-use oslo_network_runtime::{Block};
+use futures::TryFutureExt;
+use sc_service::{PartialComponents};
+use service::{frontier_database_dir, HostFunctions};
+use oslo_network_runtime::{opaque::Block, RuntimeApi};
 
 impl SubstrateCli for Cli {
 	fn impl_name() -> String { "oslo-network".into() }
@@ -18,8 +16,11 @@ impl SubstrateCli for Cli {
 
 	fn load_spec(&self, id: &str) -> Result<Box<dyn sc_cli::ChainSpec>, String> {
 		Ok(match id {
-			"dev" => Box::new(chain_spec::development_config()?),
-			"" | "testnet" => Box::new(chain_spec::testnet_config()?),
+			"dev" => {
+				let enable_manual_seal = self.sealing.map(|_| true).unwrap_or_default();
+				Box::new(chain_spec::development_config(enable_manual_seal)?) 
+			}
+			"" | "testnet" | "local" => Box::new(chain_spec::testnet_config()?),
 			"live" => Box::new(chain_spec::public_config()?),
 			path => Box::new(chain_spec::ChainSpec::from_json_file(std::path::PathBuf::from(path))?)
 		})
@@ -35,55 +36,56 @@ pub fn run() -> sc_cli::Result<()> {
 		Some(Subcommand::BuildSpec(cmd)) => {
 			let runner = cli.create_runner(cmd)?;
 			runner.sync_run(|config| cmd.run(config.chain_spec, config.network))
-		},
+		}
 		Some(Subcommand::CheckBlock(cmd)) => {
 			let runner = cli.create_runner(cmd)?;
 			runner.async_run(|config| {
-				let PartialComponents { client, task_manager, import_queue, .. } = service::new_partial(&config)?;
+				let PartialComponents { client, task_manager, import_queue, .. } = service::new_partial::<Block, RuntimeApi, HostFunctions>(&config, &cli.eth, cli.sealing)?;
 				Ok((cmd.run(client, import_queue), task_manager))
 			})
-		},
+		}
 		Some(Subcommand::ExportBlocks(cmd)) => {
 			let runner = cli.create_runner(cmd)?;
 			runner.async_run(|config| {
-				let PartialComponents { client, task_manager, .. } = service::new_partial(&config)?;
+				let PartialComponents { client, task_manager, .. } = service::new_partial::<Block, RuntimeApi, HostFunctions>(&config, &cli.eth, cli.sealing)?;
 				Ok((cmd.run(client, fc_db::kv::DatabaseSource::RocksDb {
-					path: frontier_database_dir(&config), cache_size: 0}),
+					path: frontier_database_dir(&config), cache_size: 100}),
 					task_manager
 				))
 			})
-		},
+		}
 		Some(Subcommand::ExportState(cmd)) => {
 			let runner = cli.create_runner(cmd)?;
 			runner.async_run(|config| {
-				let PartialComponents { client, task_manager, .. } = service::new_partial(&config)?;
+				let PartialComponents { client, task_manager, .. } = service::new_partial::<Block, RuntimeApi, HostFunctions>(&config, &cli.eth, cli.sealing)?;
 				Ok((cmd.run(client, config.chain_spec), task_manager))
 			})
-		},
+		}
 		Some(Subcommand::ImportBlocks(cmd)) => {
 			let runner = cli.create_runner(cmd)?;
 			runner.async_run(|config| {
-				let PartialComponents { client, task_manager, import_queue, .. } = service::new_partial(&config)?;
+				let PartialComponents { client, task_manager, import_queue, .. } = service::new_partial::<Block, RuntimeApi, HostFunctions>(&config, &cli.eth, cli.sealing)?;
 				Ok((cmd.run(client, import_queue), task_manager))
 			})
-		},
+		}
 		Some(Subcommand::PurgeChain(cmd)) => {
 			let runner = cli.create_runner(cmd)?;
 			runner.sync_run(|config| cmd.run(fc_db::kv::DatabaseSource::RocksDb {
-				path: frontier_database_dir(&config), cache_size: 0
+				path: frontier_database_dir(&config),
+				cache_size: 0
 			}))
-		},
+		}
 		Some(Subcommand::Revert(cmd)) => {
 			let runner = cli.create_runner(cmd)?;
 			runner.async_run(|config| {
-				let PartialComponents { client, task_manager, backend, .. } = service::new_partial(&config)?;
+				let PartialComponents { client, task_manager, backend, .. } = service::new_partial::<Block, RuntimeApi, HostFunctions>(&config, &cli.eth, cli.sealing)?;
 				let aux_revert = Box::new(|client, _, blocks| {
 					sc_consensus_grandpa::revert(client, blocks)?;
 					Ok(())
 				});	
 				Ok((cmd.run(client, backend, Some(aux_revert)), task_manager))
 			})
-		},
+		}
 		Some(Subcommand::Benchmark(cmd)) => {
 			let runner = cli.create_runner(cmd)?;
 
@@ -99,19 +101,20 @@ pub fn run() -> sc_cli::Result<()> {
 						cmd.run_with_spec::<sp_runtime::traits::BlakeTwo256, ()>(Some(config.chain_spec))
 					},
 					BenchmarkCmd::Block(cmd) => {
-						let PartialComponents { client, .. } = service::new_partial(&config)?;
+						let PartialComponents { client, .. } = service::new_partial::<Block, RuntimeApi, HostFunctions>(&config, &cli.eth, cli.sealing)?;
 						cmd.run(client)
 					},
 					#[cfg(not(feature = "runtime-benchmarks"))]
 					BenchmarkCmd::Storage(_) => Err("Storage benchmarking can be enabled with `--features runtime-benchmarks`.".into()),
 					#[cfg(feature = "runtime-benchmarks")]
 					BenchmarkCmd::Storage(cmd) => {
-						let PartialComponents { client, backend, .. } = service::new_partial(&config)?;
+						let enable_manual_seal = self.sealing.map(|_| true).unwrap_or_default();
+						let PartialComponents { client, backend, .. } = service::new_partial::<Block, RuntimeApi, HostFunctions>(&config, &cli.eth, cli.sealing)?;
 						let db = backend.expose_db();
 						let storage = backend.expose_storage();
 						cmd.run(config, client, db, storage)
-					},
-BenchmarkCmd::Overhead(_cmd) => {
+					}
+					BenchmarkCmd::Overhead(_cmd) => {
 						// let PartialComponents { client, .. } = service::new_partial(&config)?;
 						// let ext_builder = RemarkBuilder::new(client.clone());
 						//
@@ -120,10 +123,10 @@ BenchmarkCmd::Overhead(_cmd) => {
 						// 	client,
 						// 	inherent_benchmark_data()?,
 						// 	Vec::new(),
-						// 	&ext_builder,
+						// 	&ext_builder
 						// )
 						Ok(())
-					},
+					}
 					BenchmarkCmd::Extrinsic(_cmd) => {
 						// let PartialComponents { client, .. } = service::new_partial(&config)?;
 						// // Register the *Remark* and *TKA* builders.
@@ -132,13 +135,13 @@ BenchmarkCmd::Overhead(_cmd) => {
 						// 	Box::new(TransferKeepAliveBuilder::new(
 						// 		client.clone(),
 						// 		Sr25519Keyring::Alice.to_account_id(),
-						// 		EXISTENTIAL_DEPOSIT,
-						// 	)),
+						// 		EXISTENTIAL_DEPOSIT
+						// 	))
 						// ]);
 						//
 						// cmd.run(client, inherent_benchmark_data()?, Vec::new(), &ext_factory)
 						Ok(())
-					},
+					}
 					BenchmarkCmd::Machine(cmd) => cmd.run(&config, SUBSTRATE_REFERENCE_HARDWARE.clone())
 				}
 			})
@@ -146,11 +149,13 @@ BenchmarkCmd::Overhead(_cmd) => {
 		Some(Subcommand::ChainInfo(cmd)) => {
 			let runner = cli.create_runner(cmd)?;
 			runner.sync_run(|config| cmd.run::<Block>(&config))
-		},
+		}
 		None => {
 			let runner = cli.create_runner(&cli.run)?;
 			runner.run_node_until_exit(|config| async move {
-				service::new_full(config).map_err(sc_cli::Error::Service)
+				service::new_full::<Block, RuntimeApi, HostFunctions, sc_network::NetworkWorker<_, _>>(
+					config, &cli.eth, cli.sealing
+				).map_err(sc_cli::Error::Service).await
 			})
 		}
 	}

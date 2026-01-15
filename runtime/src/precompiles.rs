@@ -1,7 +1,8 @@
-use pallet_evm::{Precompile, PrecompileFailure, PrecompileOutput, PrecompileHandle, IsPrecompileResult, PrecompileSet};
+use pallet_evm::{Precompile, PrecompileResult, PrecompileHandle, IsPrecompileResult, PrecompileSet};
 use sp_core::H160;
 use sp_std::marker::PhantomData;
 
+use pallet_evm_precompile_curve25519 as curve25519_precompile;
 use pallet_evm_precompile_modexp::Modexp;
 use pallet_evm_precompile_sha3fips::Sha3FIPS256;
 use pallet_evm_precompile_simple::{ECRecover, ECRecoverPublicKey, Identity, Ripemd160, Sha256};
@@ -13,15 +14,25 @@ where
 	R: pallet_evm::Config
 {
 	pub fn new() -> Self { Self(Default::default()) }
-	pub fn used_addresses() -> sp_std::vec::Vec<H160> {
-		sp_std::vec![1, 2, 3, 4, 5, 1024, 1025].into_iter().map(hash).collect()
-	}
+
+	pub fn used_addresses() -> [H160; 9] {[
+		hash(1),
+		hash(2),
+		hash(3),
+		hash(4),
+		hash(5),
+		hash(1024),
+		hash(1025),
+		hash(1026),
+		hash(1027)
+	]}
 }
+
 impl<R> PrecompileSet for SubstratePrecompiles<R>
 where
-	R: pallet_evm::Config
+	R: pallet_evm::Config + frame_system::Config
 {
-	fn execute(&self, handle: &mut impl PrecompileHandle) -> Option<Result<PrecompileOutput, PrecompileFailure>> {
+	fn execute(&self, handle: &mut impl PrecompileHandle) -> Option<PrecompileResult> {
 		match handle.code_address() {
 			// Ethereum precompiles :
 			a if a == hash(1) => Some(ECRecover::execute(handle)),
@@ -30,8 +41,17 @@ where
 			a if a == hash(4) => Some(Identity::execute(handle)),
 			a if a == hash(5) => Some(Modexp::execute(handle)),
 			// Non-Frontier specific nor Ethereum precompiles :
-			a if a == hash(1024) => Some(Sha3FIPS256::execute(handle)),
+			a if a == hash(1024) => Some(Sha3FIPS256::<
+				R, crate::weights::pallet_evm_precompile_sha3fips::WeightInfo<R>
+			>::execute(handle)),
 			a if a == hash(1025) => Some(ECRecoverPublicKey::execute(handle)),
+			// Curve25519 precompiles
+			a if a == hash(1026) => Some(curve25519_precompile::Curve25519Add::<
+				R, crate::weights::pallet_evm_precompile_curve25519::WeightInfo<R>
+			>::execute(handle)),
+			a if a == hash(1027) => Some(curve25519_precompile::Curve25519ScalarMul::<
+				R, crate::weights::pallet_evm_precompile_curve25519::WeightInfo<R>
+			>::execute(handle)),
 			_ => None
 		}
 	}

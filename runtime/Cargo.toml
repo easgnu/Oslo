@@ -10,18 +10,17 @@ repository = "http://github.com/drmnana/Oslo"
 publish = false
 
 [package.metadata.docs.rs]
-#targets = ["aarch64-unknown-linux-gnu"]
-targets = ["x86_64-unknown-linux-gnu"]
+targets = ["aarch64-apple-darwin", "x86_64-pc-windows-msvc", "x86_64-unknown-linux-gnu", "aarch64-unknown-linux-gnu"]
 
 [dependencies]
-getrandom = { version = "0.2.14", default-features = false, features = ["js"] }
+log = { workspace = true }
+array-bytes = { workspace = true }
+serde_json = { workspace = true, default-features = false, features = ["alloc"] }
+hex-literal = { workspace = true }
 codec = { workspace = true, features = ["derive"] }
 scale-info = { workspace = true, features = ["derive", "serde"] }
-serde = { workspace = true, features = ["derive"] }
 libsecp256k1 = { workspace = true }
-sha3 = { workspace = true }
-log = { workspace = true }
-impl-serde = { workspace = true }
+ethereum = { workspace = true }
 
 pallet-assets = { workspace = true }
 pallet-asset-rate = { workspace = true }
@@ -55,43 +54,43 @@ sp-storage = { workspace = true }
 sp-transaction-pool = { workspace = true }
 sp-version = { workspace = true, features = ["serde"] }
 sp-io = { workspace = true }
-sp-genesis-builder = { default-features = false, git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-crates-io-v1.13.0" }
+sp-genesis-builder = { workspace = true, default-features = false }
 validator-set = { workspace = true }
 
 # Used for the node template's RPCs
-frame-system-rpc-runtime-api = { git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-crates-io-v1.13.0", default-features = false }
-pallet-transaction-payment-rpc-runtime-api = { git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-crates-io-v1.13.0", default-features = false }
+frame-system-rpc-runtime-api = { workspace = true }
+pallet-transaction-payment-rpc-runtime-api = { workspace = true }
 
 # Used for runtime benchmarking
-frame-benchmarking = { workspace = true }
-frame-system-benchmarking = { workspace = true }
+frame-benchmarking = { workspace = true, optional = true }
+frame-system-benchmarking = { workspace = true, optional = true }
 
-frame-try-runtime = { workspace = true }
+frame-try-runtime = { workspace = true, optional = true }
 
 # evm dependencies
 pallet-evm = { workspace = true }
 pallet-evm-precompile-simple = { workspace = true }
 pallet-evm-precompile-modexp = { workspace = true }
 pallet-evm-precompile-sha3fips = { workspace = true }
+pallet-evm-precompile-curve25519 = { workspace = true }
 pallet-ethereum = { workspace = true }
 pallet-im-online = { workspace = true }
+pallet-base-fee = { workspace = true }
+#pallet-evm-polkavm = { workspace = true }
 fp-evm = { workspace = true, features = ["serde"] }
 fp-rpc = { workspace = true }
 fp-account = { workspace = true, features = ["serde"] }
-pallet-base-fee = { workspace = true }
 fp-self-contained = { workspace = true, features = ["serde"] }
 
 [features]
 default = ["std"]
+ts-tests = []
 std = [
 	"log/std",
-	"sha3/std",
+	"ethereum/std",
 	"codec/std",
-	"getrandom/std",
 	"libsecp256k1/std",
 	"scale-info/std",
-	"serde/std",
-	"impl-serde/std",
 	"fp-evm/std",
 	"fp-rpc/std",
 	"fp-self-contained/std",
@@ -106,10 +105,12 @@ std = [
 	"pallet-balances/std",
 	"pallet-base-fee/std",
 	"pallet-evm/std",
+	#"pallet-evm-polkavm/std",
 	"pallet-session/std",
 	"pallet-evm-precompile-simple/std",
 	"pallet-evm-precompile-modexp/std",
 	"pallet-evm-precompile-sha3fips/std",
+	"pallet-evm-precompile-curve25519/std",
 	"pallet-ethereum/std",
 	"pallet-grandpa/std",
 	"pallet-sudo/std",
@@ -144,7 +145,7 @@ std = [
 runtime-benchmarks = [
 	"frame-benchmarking/runtime-benchmarks",
 	"frame-support/runtime-benchmarks",
-	"frame-system-benchmarking/runtime-benchmarks",
+	"frame-system-benchmarking?/runtime-benchmarks",
 	"frame-system/runtime-benchmarks",
 	"pallet-balances/runtime-benchmarks",
 	"pallet-grandpa/runtime-benchmarks",
@@ -164,7 +165,7 @@ try-runtime = [
 	"frame-executive/try-runtime",
 	"frame-support/try-runtime",
 	"frame-system/try-runtime",
-	"frame-try-runtime/try-runtime",
+	"frame-try-runtime?/try-runtime",
 	"pallet-aura/try-runtime",
 	"pallet-preimage/try-runtime",
 	"pallet-balances/try-runtime",
@@ -187,4 +188,4 @@ try-runtime = [
 ]
 
 [build-dependencies]
-substrate-wasm-builder = { git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-crates-io-v1.13.0", optional = true }
+substrate-wasm-builder = { workspace = true, optional = true }

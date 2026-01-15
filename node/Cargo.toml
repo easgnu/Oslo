@@ -11,56 +11,60 @@ repository = "http://github.com/drmnana/Oslo"
 build = "build.rs"
 
 [package.metadata.docs.rs]
-#targets = ["aarch64-unknown-linux-gnu"]
-targets = ["x86_64-unknown-linux-gnu"]
-
+targets = ["aarch64-apple-darwin", "x86_64-pc-windows-msvc", "x86_64-unknown-linux-gnu", "aarch64-unknown-linux-gnu"]
 [[bin]]
 name = "oslo-network"
 
 [dependencies]
-rustc-hex = { version = "2.1.0" }
-serde_json = { version = "1.0.114", default-features = false, features = ["arbitrary_precision"] }
-jsonrpsee = { default-features = false, version = "0.22", features = ["server", "macros"] }
+serde_json = { workspace = true, features = ["arbitrary_precision"] }
+jsonrpsee = { version = "0.24.9", features = ["server", "macros"] }
 clap = { workspace = true }
+log = { workspace = true }
+async-trait = { workspace = true }
 hex-literal = { workspace = true }
 futures = { workspace = true }
-futures-util = { workspace = true }
 array-bytes = { workspace = true }
+codec = { workspace = true }
+prometheus-endpoint = { workspace = true }
 
 fp-account = { workspace = true, features = ["serde"] }
-fp-rpc = { workspace = true }
-fp-storage = { workspace = true }
-fp-dynamic-fee = { workspace = true, default-features = true }
-fp-evm = { workspace = true }
+fp-rpc = { workspace = true, features = ["default"] }
+fp-dynamic-fee = { workspace = true, features = ["default"] }
+fp-evm = { workspace = true, features = ["default"] }
 
-fc-rpc = { workspace = true }
+fc-rpc = { workspace = true, features = ["aura", "txpool", "rocksdb", "rpc-binary-search-estimate"] }
 fc-db = { workspace = true, features = ["rocksdb"] }
 fc-consensus = { workspace = true }
 fc-rpc-core = { workspace = true }
-fc-mapping-sync = { workspace = true }
+fc-mapping-sync = { workspace = true, features = ["rocksdb"] }
 fc-api = { workspace = true }
 fc-storage = { workspace = true }
-fc-cli = { workspace = true }
+fc-cli = { workspace = true, features = ["rocksdb"] }
 
-sp-io = { workspace = true }
-sp-consensus-aura = { workspace = true }
-sp-consensus = { workspace = true }
-sp-consensus-grandpa = { workspace = true, features = ["serde", "sp-keystore"] }
-sp-timestamp = { workspace = true }
-sp-core = { workspace = true }
-sp-runtime = { workspace = true }
+sp-io = { workspace = true, features = ["default"] }
+sp-consensus-aura = { workspace = true, features = ["default"] }
+sp-consensus-grandpa = { workspace = true, features = ["default"] }
+sp-timestamp = { workspace = true, features = ["default"] }
+sp-core = { workspace = true, features = ["default"] }
+sp-runtime = { workspace = true, features = ["default"] }
 sp-blockchain = { workspace = true }
 sp-block-builder = { workspace = true }
-sp-api = { workspace = true }
-sp-inherents = { workspace = true }
+sp-api = { workspace = true, features = ["default"] }
+sp-inherents = { workspace = true, features = ["default"] }
+sp-transaction-pool = { workspace = true, features = ["default"] }
+sp-session = { workspace = true, features = ["default"] }
+sp-offchain = { workspace = true, features = ["default"] }
 
 sc-consensus = { workspace = true }
 sc-consensus-aura = { workspace = true }
 sc-consensus-grandpa = { workspace = true }
-sc-cli = { workspace = true }
+sc-consensus-manual-seal = { workspace = true, optional = true }
+sc-cli = { workspace = true, features = ["rocksdb"] }
 sc-client-api = { workspace = true }
+sc-client-db = { workspace = true }
+sc-rpc = { workspace = true }
 sc-rpc-api = { workspace = true }
-sc-service = { workspace = true }
+sc-service = { workspace = true, features = ["rocksdb"] }
 sc-telemetry = { workspace = true }
 sc-keystore = { workspace = true }
 sc-executor = { workspace = true }
@@ -71,39 +75,37 @@ sc-network-sync = { workspace = true }
 sc-basic-authorship = { workspace = true }
 sc-offchain = { workspace = true }
 
-pallet-transaction-payment-rpc = { git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-crates-io-v1.13.0" }
+pallet-transaction-payment-rpc = { workspace = true }
 pallet-im-online = { workspace = true }
 pallet-collective = { workspace = true }
 pallet-sudo = { workspace = true }
 pallet-transaction-payment = { workspace = true }
+pallet-transaction-payment-rpc-runtime-api = { workspace = true }
+#pallet-evm-polkavm = { workspace = true }
 
 frame-system = { workspace = true }
+frame-system-rpc-runtime-api = { workspace = true }
 frame-benchmarking = { workspace = true }
 frame-benchmarking-cli = { workspace = true }
-substrate-frame-rpc-system = { git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-crates-io-v1.13.0" }
+substrate-frame-rpc-system = { workspace = true }
+
+# Cumulus primitives
+cumulus-primitives-proof-size-hostfunction = { workspace = true }
 
 # Local Dependencies
-oslo-network-runtime = { path = "../runtime" }
+oslo-network-runtime = { workspace = true, features = ["std"] }
 
 [build-dependencies]
-substrate-build-script-utils = { git = "https://github.com/paritytech/polkadot-sdk.git", branch = "release-crates-io-v1.13.0" }
+substrate-build-script-utils = { workspace = true, default-features = true }
 
 [features]
-default = ["rocksdb"]
-rocksdb = [
-	"sc-cli/rocksdb",
-	"sc-service/rocksdb",
-	"fc-cli/rocksdb",
-	"fc-db/rocksdb",
-	"fc-mapping-sync/rocksdb",
-	"fc-rpc/rocksdb"
+ts-tests = [
+	"oslo-network-runtime/ts-tests",
+	"sc-consensus-manual-seal"
 ]
 
 # Dependencies that are only required if runtime benchmarking should be built.
 runtime-benchmarks = [
 	"oslo-network-runtime/runtime-benchmarks",
-	"frame-benchmarking-cli/runtime-benchmarks",
-	"frame-system/runtime-benchmarks",
-	"sc-service/runtime-benchmarks",
-	"sp-runtime/runtime-benchmarks"
+	"sc-service/runtime-benchmarks"
 ]
