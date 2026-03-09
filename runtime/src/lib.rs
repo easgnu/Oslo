@@ -97,10 +97,12 @@ pub mod currency {
 	pub const MILLIOSLO: Balance = 1_000_000_000;
 	pub const OSLO: Balance = 1_000_000_000_000;
 	pub const KILOOSLO: Balance = 1_000_000_000_000_000;
+	pub const MEGAOSLO: Balance = 1_000_000_000_000_000_000;
 
-	pub const TRANSACTION_BYTE_FEE: Balance = 1 * NANOOSLO;
-	pub const STORAGE_BYTE_FEE: Balance = 1 * NANOOSLO;
-	pub const WEIGHT_FEE: Balance = 1 * NANOOSLO;
+	// Transaction and storage fees adjusted for production traffic
+	pub const TRANSACTION_BYTE_FEE: Balance = 10 * NANOOSLO;
+	pub const STORAGE_BYTE_FEE: Balance = 50 * NANOOSLO;
+	pub const WEIGHT_FEE: Balance = 5 * NANOOSLO;
 
 	pub const fn deposit(items: u32, bytes: u32) -> Balance {
 		items as Balance * NANOOSLO + (bytes as Balance) * STORAGE_BYTE_FEE
